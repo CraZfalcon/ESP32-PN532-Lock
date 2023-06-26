@@ -218,10 +218,10 @@ void loop() {
     http.GET();
     if (http.getString() == "true") {
       digitalWrite(5, HIGH);
-      Serial.println("OPEN");
+      Serial.println("Door opened");
       delay(atoi(Open));
       digitalWrite(5, LOW);
-      Serial.println("CLOSE");
+      Serial.println("Door closed");
       delay(500);
     }
     http.end();
