@@ -80,7 +80,9 @@ void setup() {
   }
 
   if(SPIFFS.begin()){
+    Serial.println("mounted file system");
     if (SPIFFS.exists("/config.json")) {
+      Serial.println("reading config file");
       File configFile = SPIFFS.open("/config.json", "r");
       if (configFile) {
         size_t size = configFile.size();
@@ -96,8 +98,18 @@ void setup() {
         strcpy(Location, doc["Location"]);
         strcpy(Open, doc["Open"]);
         configFile.close();
+        Serial.println("Successfully read config file");
       }
     }
+  }
+  else if (!SPIFFS.begin()) {
+    Serial.println("Failed to mount file system");
+    Serial.println("Formatting...");
+    SPIFFS.format();
+    delay(1000);
+    ESP.restart();
+    delay(5000);
+    return;
   }
 
   wfm.setSaveConfigCallback(saveConfigCallback);
@@ -177,6 +189,18 @@ void loop() {
 
         if(KeyWord == "RESET"){
           wfm.resetSettings();
+          DynamicJsonDocument doc(1024);
+          doc["DoorName"] = "";
+          doc["DoorPass"] = "";
+          doc["apikey"] = "";
+          doc["apiport"] = "";
+          doc["Door"] = "";
+          doc["Location"] = "";
+          doc["Open"] = "";
+          File configFile = SPIFFS.open("/config.json", "w");
+          serializeJson(doc, configFile);
+          configFile.close();
+          delay(1000);
           ESP.restart();
           delay(5000);
           return;
