@@ -1,6 +1,21 @@
 ArduinoJson: change log
 =======================
 
+HEAD
+----
+
+* Fix error `'std::string' has not been declared` (issue #1967)
+* Fix error `'std::string_view' has not been declared` (issue #1967)
+
+v6.21.3 (2023-07-23)
+-------
+
+* Fix compatibility with the Blynk libary (issue #1914)
+* Fix double lookup in `to<JsonVariant>()`
+* Fix double call to `size()` in `serializeMsgPack()`
+* Include `ARDUINOJSON_SLOT_OFFSET_SIZE` in the namespace name
+* Show a link to the documentation when user passes an unsupported input type
+
 v6.21.2 (2023-04-12)
 -------
 
