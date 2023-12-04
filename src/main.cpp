@@ -17,10 +17,6 @@ WiFiManager wfm;
 PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 
-bool shouldSaveConfig = false;
-
-String KeyWord = "";
-String serverPath = "";
 char Door_Name[100] = "Door_Config";
 char Door_Pass[100] = "123456789";
 char api_key[100];
@@ -37,32 +33,33 @@ WiFiManagerParameter Door_Adress("Door", "Door:", Door, 5);
 WiFiManagerParameter Location_Adress("Location", "Location:", Location, 4);
 WiFiManagerParameter Open_Duration("Open_Duration", "Open Duration (ms):", Open, 4);
 
-void saveConfigCallback () { shouldSaveConfig = true; }
+void saveConfigCallback () { 
+    strcpy(Door_Name, Door_Name_WFM.getValue());
+    strcpy(Door_Pass, Door_Pass_WFM.getValue());
+    strcpy(api_key, api_key_Adress.getValue());
+    strcpy(api_port, api_port_Adress.getValue());
+    strcpy(Door, Door_Adress.getValue());
+    strcpy(Location, Location_Adress.getValue());
+    strcpy(Open, Open_Duration.getValue());
+    DynamicJsonDocument doc(1024);
+    doc["DoorName"] = Door_Name;
+    doc["DoorPass"] = Door_Pass;
+    doc["apikey"] = api_key;
+    doc["apiport"] = api_port;
+    doc["Door"] = Door;
+    doc["Location"] = Location;
+    doc["Open"] = Open;
+    File configFile = SPIFFS.open("/config.json", "w");
+    serializeJson(doc, configFile);
+    configFile.close();
+}
+
 void menubtn() {
   if ( digitalRead(20) == LOW ) {
     delay(1000);
     if ( digitalRead(20) == LOW ) {
-      wfm.setSaveConfigCallback(saveConfigCallback);
       wfm.startConfigPortal(Door_Name, Door_Pass);
-      strcpy(Door_Name, Door_Name_WFM.getValue());
-      strcpy(api_key, api_key_Adress.getValue());
-      strcpy(api_key, api_key_Adress.getValue());
-      strcpy(api_port, api_port_Adress.getValue());
-      strcpy(Door, Door_Adress.getValue());
-      strcpy(Location, Location_Adress.getValue());
-      strcpy(Open, Open_Duration.getValue());
-
-      DynamicJsonDocument doc(1024);
-      doc["DoorName"] = Door_Name;
-      doc["DoorPass"] = Door_Pass;
-      doc["apikey"] = api_key;
-      doc["apiport"] = api_port;
-      doc["Door"] = Door;
-      doc["Location"] = Location;
-      doc["Open"] = Open;
-      File configFile = SPIFFS.open("/config.json", "w");
-      serializeJson(doc, configFile);
-      configFile.close();
+      wfm.setSaveConfigCallback(saveConfigCallback);
     }
   }
 }
@@ -102,6 +99,7 @@ void setup() {
       }
     }
   }
+
   else if (!SPIFFS.begin()) {
     Serial.println("Failed to mount file system");
     Serial.println("Formatting...");
@@ -131,26 +129,6 @@ void setup() {
     delay(5000);
   }
 
-  if (shouldSaveConfig) {
-    strcpy(Door_Name, Door_Name_WFM.getValue());
-    strcpy(Door_Pass, Door_Pass_WFM.getValue());
-    strcpy(api_key, api_key_Adress.getValue());
-    strcpy(api_port, api_port_Adress.getValue());
-    strcpy(Door, Door_Adress.getValue());
-    strcpy(Location, Location_Adress.getValue());
-    strcpy(Open, Open_Duration.getValue());
-    DynamicJsonDocument doc(1024);
-    doc["DoorName"] = Door_Name;
-    doc["DoorPass"] = Door_Pass;
-    doc["apikey"] = api_key;
-    doc["apiport"] = api_port;
-    doc["Door"] = Door;
-    doc["Location"] = Location;
-    doc["Open"] = Open;
-    File configFile = SPIFFS.open("/config.json", "w");
-    serializeJson(doc, configFile);
-    configFile.close();
-  }
   nfc.begin();
 }
 
@@ -159,86 +137,84 @@ void loop() {
   if (nfc.tagPresent()) {
 
     NfcTag KeyContents = nfc.read();
-    KeyWord = "";
+    String KeyWord = "";
     KeyWord = KeyContents.getUidString();
     KeyWord.replace(" ", "");
     KeyWord.toUpperCase();
 
     if(KeyContents.hasNdefMessage()){
       NdefMessage message = KeyContents.getNdefMessage();
-      int recordCount = message.getRecordCount();
-      for (int i = 0; i < recordCount; i++) {
-        NdefRecord record = message.getRecord(i);
-        int payloadLength = record.getPayloadLength();
-        byte payload[payloadLength];
-        record.getPayload(payload);
-        KeyWord = "";
-        for (int c = 0; c < payloadLength; c++) {
-          KeyWord += (char)payload[c];
-        }
+      NdefRecord record = message.getRecord(message.getRecordCount() - 1);
+      int payloadLength = record.getPayloadLength();
+      byte payload[20];
+      record.getPayload(payload);
+      KeyWord = "";
+      for (int i = 0; i < payloadLength; i++) {
+        KeyWord += (char)payload[i];
+      }
 
-        if(KeyWord == "OVERRIDE"){
-          digitalWrite(5, HIGH);
-          Serial.println("OPEN");
-          delay(atoi(Open));
-          digitalWrite(5, LOW);
-          Serial.println("CLOSE");
-          delay(500);
-          return;
-        }
+      if(KeyWord == "OVERRIDE"){
+        digitalWrite(5, HIGH);
+        Serial.println("OPEN");
+        delay(atoi(Open));
+        digitalWrite(5, LOW);
+        Serial.println("CLOSE");
+        delay(500);
+        return;
+      }
 
-        if(KeyWord == "RESET"){
-          wfm.resetSettings();
-          DynamicJsonDocument doc(1024);
-          doc["DoorName"] = "";
-          doc["DoorPass"] = "";
-          doc["apikey"] = "";
-          doc["apiport"] = "";
-          doc["Door"] = "";
-          doc["Location"] = "";
-          doc["Open"] = "";
-          File configFile = SPIFFS.open("/config.json", "w");
-          serializeJson(doc, configFile);
-          configFile.close();
-          delay(1000);
-          ESP.restart();
-          delay(5000);
-          return;
-        }
+      if(KeyWord == "RESET"){
+        wfm.resetSettings();
+        DynamicJsonDocument doc(1024);
+        doc["DoorName"] = "";
+        doc["DoorPass"] = "";
+        doc["apikey"] = "";
+        doc["apiport"] = "";
+        doc["Door"] = "";
+        doc["Location"] = "";
+        doc["Open"] = "";
+        File configFile = SPIFFS.open("/config.json", "w");
+        serializeJson(doc, configFile);
+        configFile.close();
+        delay(1000);
+        ESP.restart();
+        delay(5000);
+        return;
+      }
 
-        if(KeyWord == "CONFIG"){
-          wfm.setSaveConfigCallback(saveConfigCallback);
-          wfm.setConfigPortalTimeout(300);
-          wfm.startConfigPortal(Door_Name, Door_Pass);
-          strcpy(Door_Name, Door_Name_WFM.getValue());
-          strcpy(api_key, api_key_Adress.getValue());
-          strcpy(api_key, api_key_Adress.getValue());
-          strcpy(api_port, api_port_Adress.getValue());
-          strcpy(Door, Door_Adress.getValue());
-          strcpy(Location, Location_Adress.getValue());
-          strcpy(Open, Open_Duration.getValue());
+      if(KeyWord == "CONFIG"){
+        wfm.setSaveConfigCallback(saveConfigCallback);
+        wfm.setConfigPortalTimeout(300);
+        wfm.startConfigPortal(Door_Name, Door_Pass);
+        strcpy(Door_Name, Door_Name_WFM.getValue());
+        strcpy(api_key, api_key_Adress.getValue());
+        strcpy(api_key, api_key_Adress.getValue());
+        strcpy(api_port, api_port_Adress.getValue());
+        strcpy(Door, Door_Adress.getValue());
+        strcpy(Location, Location_Adress.getValue());
+        strcpy(Open, Open_Duration.getValue());
 
-          DynamicJsonDocument doc(1024);
-          doc["DoorName"] = Door_Name;
-          doc["DoorPass"] = Door_Pass;
-          doc["apikey"] = api_key;
-          doc["apiport"] = api_port;
-          doc["Door"] = Door;
-          doc["Location"] = Location;
-          doc["Open"] = Open;
-          File configFile = SPIFFS.open("/config.json", "w");
-          serializeJson(doc, configFile);
-          configFile.close();
-          return;
-        }
+        DynamicJsonDocument doc(1024);
+        doc["DoorName"] = Door_Name;
+        doc["DoorPass"] = Door_Pass;
+        doc["apikey"] = api_key;
+        doc["apiport"] = api_port;
+        doc["Door"] = Door;
+        doc["Location"] = Location;
+        doc["Open"] = Open;
+        File configFile = SPIFFS.open("/config.json", "w");
+        serializeJson(doc, configFile);
+        configFile.close();
+        return;
       }
     }
 
     Serial.println(KeyWord);
     
-    serverPath = "https://" + String(api_key) + ":" + String(api_port) + "/api/DoorAccess?AccessTag_ID=" + KeyWord + "&Id_Door=" + String(Door) + "&Location=" + String(Location);
-
-    http.begin(serverPath.c_str());
+    http.begin("https://" + String(api_key) + ":" + String(api_port)
+              + "/api/DoorAccess?AccessTag_ID=" + String(KeyWord)
+              + "&Id_Door=" + String(Door)
+              + "&Location=" + String(Location));
     http.GET();
     if (http.getString() == "true") {
       digitalWrite(5, HIGH);
