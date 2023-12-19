@@ -1,0 +1,5 @@
+.pio
+lib/*
+test.log
+.vscode
+emulation.log
